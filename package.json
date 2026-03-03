@@ -1,0 +1,19 @@
+{
+  "name": "obsidian-hide-date-prefix",
+  "version": "1.0.0",
+  "description": "Obsidian plugin to hide date prefixes in the file explorer",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": ["obsidian", "plugin"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^16.11.6",
+    "obsidian": "latest",
+    "typescript": "4.7.4",
+    "esbuild": "0.17.3",
+    "builtin-modules": "3.3.0"
+  }
+}

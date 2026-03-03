@@ -1,0 +1,14 @@
+/*
+  Hide Date Prefix – styles
+  The .hdp-date span is hidden so only .hdp-rest is visible.
+  Sort order is unaffected because Obsidian sorts by the actual filename,
+  not by the displayed text content.
+*/
+
+.nav-file-title-content .hdp-date {
+  display: none;
+}
+
+.nav-file-title-content .hdp-rest {
+  /* Intentionally unstyled — inherits whatever the active theme sets */
+}
