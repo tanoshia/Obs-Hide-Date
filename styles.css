@@ -12,3 +12,8 @@
 .nav-file-title-content .hdp-rest {
   /* Intentionally unstyled — inherits whatever the active theme sets */
 }
+
+.nav-file-title-content .hdp-today {
+  /* Intentionally unstyled — inherits whatever the active theme sets.
+     Add custom styles here if you want to highlight today's note. */
+}

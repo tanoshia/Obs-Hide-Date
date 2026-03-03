@@ -12,10 +12,16 @@ export interface HideDatePrefixSettings {
 	 * Default: bare date-only filenames, e.g. Daily Notes like "2026-02-03".
 	 */
 	ignorePatterns: string[];
+	/**
+	 * When true, a Daily Note whose filename is exactly today's date is shown
+	 * as "Today     -DD" instead of the raw date.
+	 */
+	showTodayLabel: boolean;
 }
 
 export const DEFAULT_SETTINGS: HideDatePrefixSettings = {
 	enabled: true,
 	datePattern: '^(\\d{4}-\\d{2}-\\d{2})\\s*',
 	ignorePatterns: ['^\\d{4}-\\d{2}-\\d{2}$'],
+	showTodayLabel: true,
 };

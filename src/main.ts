@@ -13,6 +13,9 @@ export default class HideDatePrefixPlugin extends Plugin {
 			this.startObserver();
 		});
 
+		// Refresh at midnight so the "Today" label moves to the new day automatically
+		this.scheduleMidnightRefresh();
+
 		// Re-process after any vault rename so the explorer always reflects the
 		// latest filename immediately, regardless of how Obsidian updates the DOM.
 		this.registerEvent(this.app.vault.on('rename', () => {
@@ -128,15 +131,28 @@ export default class HideDatePrefixPlugin extends Plugin {
 	}
 
 	/**
-	 * Splits the title element into a hidden date span and a visible rest span.
+	 * Splits the title element into a hidden date span and a visible rest span,
+	 * or replaces a bare today note with the "Today     -DD" label.
 	 * No-ops if the element is already processed, the filename has no date prefix,
 	 * or the full filename matches one of the configured ignore patterns.
 	 */
 	processItem(el: HTMLElement) {
 		// Already processed — skip
-		if (el.querySelector('.hdp-date')) return;
+		if (el.querySelector('.hdp-date') || el.querySelector('.hdp-today')) return;
 
 		const fullTitle = el.textContent ?? '';
+
+		// Today label: check before ignore patterns so bare-date Daily Notes can
+		// still be relabelled even though they match the default ignore list.
+		if (this.settings.showTodayLabel) {
+			const label = this.getTodayLabel(fullTitle);
+			if (label !== null) {
+				el.dataset.hdpOriginal = fullTitle;
+				el.empty();
+				el.createSpan({ cls: 'hdp-today', text: label });
+				return;
+			}
+		}
 
 		// Check user-defined ignore patterns against the full filename
 		if (this.isIgnored(fullTitle)) return;
@@ -149,6 +165,7 @@ export default class HideDatePrefixPlugin extends Plugin {
 		const restPart = fullTitle.slice(datePart.length);
 		// Safety net: skip if nothing remains after the date
 		if (restPart.trim() === '') return;
+		el.dataset.hdpOriginal = fullTitle;
 		el.empty();
 		el.createSpan({ cls: 'hdp-date', text: datePart });
 		el.createSpan({ cls: 'hdp-rest', text: restPart });
@@ -174,11 +191,12 @@ export default class HideDatePrefixPlugin extends Plugin {
 	 * Restore an element to its original plain-text form.
 	 */
 	restoreItem(el: HTMLElement) {
-		if (!el.querySelector('.hdp-date')) return;
+		if (!el.querySelector('.hdp-date') && !el.querySelector('.hdp-today')) return;
 
-		const full = el.textContent ?? '';
+		const original = el.dataset.hdpOriginal ?? '';
 		el.empty();
-		el.textContent = full;
+		delete el.dataset.hdpOriginal;
+		if (original) el.textContent = original;
 	}
 
 	restoreAllItems() {
@@ -188,6 +206,37 @@ export default class HideDatePrefixPlugin extends Plugin {
 	}
 
 	// ─── Helpers ──────────────────────────────────────────────────────────────
+
+	/**
+	 * If fullTitle is exactly today's date (YYYY-MM-DD), returns the display
+	 * label "Today     -DD". Otherwise returns null.
+	 */
+	getTodayLabel(fullTitle: string): string | null {
+		const now = new Date();
+		const yyyy = now.getFullYear();
+		const mm = String(now.getMonth() + 1).padStart(2, '0');
+		const dd = String(now.getDate()).padStart(2, '0');
+		const todayStr = `${yyyy}-${mm}-${dd}`;
+		if (fullTitle.trim() !== todayStr) return null;
+		return `Today     -${dd}`;
+	}
+
+	/**
+	 * Schedules a refresh at the next midnight so the "Today" label
+	 * automatically moves to the new date without restarting Obsidian.
+	 */
+	scheduleMidnightRefresh() {
+		const now = new Date();
+		const midnight = new Date(now);
+		midnight.setDate(midnight.getDate() + 1);
+		midnight.setHours(0, 0, 5, 0); // 5 s past midnight
+		const ms = midnight.getTime() - now.getTime();
+		const id = window.setTimeout(() => {
+			this.refresh();
+			this.scheduleMidnightRefresh();
+		}, ms);
+		this.register(() => window.clearTimeout(id));
+	}
 
 	buildPattern(): RegExp {
 		try {
@@ -276,5 +325,21 @@ class HideDatePrefixSettingTab extends PluginSettingTab {
 				area.inputEl.style.width = '100%';
 				area.inputEl.rows = 5;
 			});
+
+		new Setting(containerEl)
+			.setName('Show "Today" label for today\'s daily note')
+			.setDesc(
+				'When enabled, a Daily Note whose filename is exactly today\'s date ' +
+				'(e.g. "2026-03-03") is displayed as "Today     -DD" (e.g. "Today     -03"). ' +
+				'The label updates automatically at midnight.'
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showTodayLabel)
+					.onChange(async (value) => {
+						this.plugin.settings.showTodayLabel = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }
