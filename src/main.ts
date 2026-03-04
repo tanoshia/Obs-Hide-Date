@@ -579,6 +579,7 @@ class HideDatePrefixSettingTab extends PluginSettingTab {
 					});
 				area.inputEl.style.width = '100%';
 				area.inputEl.rows = 3;
+				area.inputEl.style.resize = 'vertical';
 			});
 		// Move the textarea below the description instead of beside it
 		ignoreSetting.settingEl.style.flexWrap = 'wrap';
