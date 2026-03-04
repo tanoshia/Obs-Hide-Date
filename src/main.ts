@@ -184,6 +184,37 @@ export default class HideDatePrefixPlugin extends Plugin {
 	}
 
 	/**
+	 * Converts an ISO token format string into a full-match regex (^...$).
+	 * Tokens ({YYYY}, {MM}, etc.) become \d{N}.
+	 * `*` in literal segments matches any characters (becomes .* in regex).
+	 * All other literal characters are regex-escaped.
+	 */
+	formatToIgnorePattern(format: string): RegExp {
+		const tokenMap: Record<string, string> = {
+			'{YYYY}': '\\d{4}',
+			'{MM}':   '\\d{2}',
+			'{DD}':   '\\d{2}',
+			'{hh}':   '\\d{2}',
+			'{mm}':   '\\d{2}',
+			'{ss}':   '\\d{2}',
+		};
+		// Escape a literal segment, treating * as the .* wildcard
+		const escapeLiteral = (s: string) =>
+			s.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*');
+		const tokenRegex = /\{YYYY\}|\{MM\}|\{DD\}|\{hh\}|\{mm\}|\{ss\}/g;
+		let result = '';
+		let lastIndex = 0;
+		let m: RegExpExecArray | null;
+		while ((m = tokenRegex.exec(format)) !== null) {
+			result += escapeLiteral(format.slice(lastIndex, m.index));
+			result += tokenMap[m[0]];
+			lastIndex = tokenRegex.lastIndex;
+		}
+		result += escapeLiteral(format.slice(lastIndex));
+		return new RegExp(`^${result}$`);
+	}
+
+	/**
 	 * Returns true if the full filename matches any of the configured ignore patterns.
 	 */
 	isIgnored(fullTitle: string): boolean {
@@ -191,9 +222,9 @@ export default class HideDatePrefixPlugin extends Plugin {
 			const trimmed = raw.trim();
 			if (!trimmed) continue;
 			try {
-				if (new RegExp(trimmed).test(fullTitle)) return true;
+				if (this.formatToIgnorePattern(trimmed).test(fullTitle)) return true;
 			} catch {
-				// invalid regex — skip silently
+				// skip silently
 			}
 		}
 		return false;
@@ -220,37 +251,49 @@ export default class HideDatePrefixPlugin extends Plugin {
 	// ─── Helpers ──────────────────────────────────────────────────────────────
 
 	/**
-	 * If fullTitle is exactly today's date (YYYY-MM-DD), returns the display
-	 * label "Today     -DD". Otherwise returns null.
+	 * Returns today's date formatted according to the configured dateFormat,
+	 * e.g. "2026-03-03" for the default {YYYY}-{MM}-{DD}.
 	 */
-	getTodayLabel(fullTitle: string): string | null {
-		const now = new Date();
-		const yyyy = now.getFullYear();
-		const mm = String(now.getMonth() + 1).padStart(2, '0');
-		const dd = String(now.getDate()).padStart(2, '0');
-		const todayStr = `${yyyy}-${mm}-${dd}`;
-		if (fullTitle.trim() !== todayStr) return null;
-		return `Today     -${dd}`;
+	getTodayDateStr(): string {
+		return this.formatTodayLabel(this.settings.dateFormat);
 	}
 
 	/**
-	 * If fullTitle starts with today's date followed by optional whitespace and
-	 * has additional content after the date, returns the title with the date
-	 * replaced by "Today". e.g. "2026-03-03 Meetings" → "Today Meetings".
-	 * Returns null if the title doesn't start with today's date or has nothing
-	 * after the date (bare dates are handled by getTodayLabel instead).
+	 * Substitutes {YYYY}, {MM}, {DD} tokens in a format string with today's date parts.
 	 */
-	getTodayLabelForPrefixed(fullTitle: string): string | null {
+	formatTodayLabel(format: string): string {
 		const now = new Date();
-		const yyyy = now.getFullYear();
+		const yyyy = String(now.getFullYear());
 		const mm = String(now.getMonth() + 1).padStart(2, '0');
 		const dd = String(now.getDate()).padStart(2, '0');
-		const todayStr = `${yyyy}-${mm}-${dd}`;
-		const match = new RegExp(`^${todayStr}\\s*`).exec(fullTitle);
+		return format
+			.replace(/\{YYYY\}/g, yyyy)
+			.replace(/\{MM\}/g, mm)
+			.replace(/\{DD\}/g, dd);
+	}
+
+	/**
+	 * If fullTitle is exactly today's date, returns the formatted Today label.
+	 * Otherwise returns null.
+	 */
+	getTodayLabel(fullTitle: string): string | null {
+		if (fullTitle.trim() !== this.getTodayDateStr()) return null;
+		return this.formatTodayLabel(this.settings.todayLabelFormat);
+	}
+
+	/**
+	 * If fullTitle starts with today's date and has content after it, returns
+	 * the formatted Today label prefix with the rest of the filename appended.
+	 * Returns null for bare dates (handled by getTodayLabel).
+	 */
+	getTodayLabelForPrefixed(fullTitle: string): string | null {
+		const todayStr = this.getTodayDateStr();
+		const escaped = todayStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const match = new RegExp(`^${escaped}\\s*`).exec(fullTitle);
 		if (!match) return null;
 		const rest = fullTitle.slice(match[0].length);
 		if (rest.trim() === '') return null; // bare date — handled by getTodayLabel
-		return `Today     -${dd} ${rest}`;
+		return this.formatTodayLabel(this.settings.todayLabelForIgnoredFormat) + rest;
 	}
 
 	/**
@@ -270,12 +313,27 @@ export default class HideDatePrefixPlugin extends Plugin {
 		this.register(() => window.clearTimeout(id));
 	}
 
+	/**
+	 * Converts an ISO token format string to a regex that matches that date prefix.
+	 * {YYYY} -> \d{4}, {MM}/{DD}/{hh}/{mm}/{ss} -> \d{2}.
+	 * Wraps in ^(...)\s* so it anchors at the start and swallows trailing spaces.
+	 */
+	formatToPattern(format: string): RegExp {
+		const regexBody = format
+			.replace(/\{YYYY\}/g, '\\d{4}')
+			.replace(/\{MM\}/g, '\\d{2}')
+			.replace(/\{DD\}/g, '\\d{2}')
+			.replace(/\{hh\}/g, '\\d{2}')
+			.replace(/\{mm\}/g, '\\d{2}')
+			.replace(/\{ss\}/g, '\\d{2}');
+		return new RegExp(`^(${regexBody})\\s*`);
+	}
+
 	buildPattern(): RegExp {
 		try {
-			return new RegExp(this.settings.datePattern);
+			return this.formatToPattern(this.settings.dateFormat);
 		} catch {
-			// Fall back to default if user supplied an invalid regex
-			return new RegExp(DEFAULT_SETTINGS.datePattern);
+			return this.formatToPattern(DEFAULT_SETTINGS.dateFormat);
 		}
 	}
 
@@ -318,34 +376,36 @@ class HideDatePrefixSettingTab extends PluginSettingTab {
 					})
 			);
 
-		let datePatternInputEl: HTMLInputElement | null = null;
+		let dateFormatInputEl: HTMLInputElement | null = null;
 
 		new Setting(containerEl)
-			.setName('Date pattern (regex)')
+			.setName('Date format')
 			.setDesc(
-				'Regex anchored at the start of each filename that identifies the date prefix to hide. ' +
-				'Example: ^(\\d{8})\\s* for filenames like 20260303.'
+				'ISO 8601 date format at the start of filenames to hide. Uses {YYYY}, {MM}, {DD}, {hh}, {mm}, {ss} tokens.  ' +
+				'Default: {YYYY}-{MM}-{DD}.  ' +
+				'Example for full datetime: {YYYY}-{MM}-{DD}T{hh}:{mm}:{ss}Z'
 			)
 			.addText((text) => {
-				datePatternInputEl = text.inputEl;
+				dateFormatInputEl = text.inputEl;
 				text
-					.setPlaceholder('^(\\d{4}-\\d{2}-\\d{2})\\s*')
-					.setValue(this.plugin.settings.datePattern)
+					.setPlaceholder('{YYYY}-{MM}-{DD}')
+					.setValue(this.plugin.settings.dateFormat)
 					.onChange(async (value) => {
-						this.plugin.settings.datePattern = value.trim() || DEFAULT_SETTINGS.datePattern;
+						this.plugin.settings.dateFormat = value.trim() || DEFAULT_SETTINGS.dateFormat;
 						await this.plugin.saveSettings();
 					});
 			});
 
 		new Setting(containerEl)
-			.setName('Ignore patterns (one regex per line)')
+			.setName('Patterns to ignore (one per line)')
 			.setDesc(
-				'Files whose full name matches any pattern are left untouched (date prefix not hidden). One regex per line. ' +
-				'Example: ^\\d{4}-\\d{2}-\\d{2}$ ignores bare daily notes like "2026-02-03".'
+				'Files whose full name matches any pattern are left untouched (date not hidden).  ' +
+				'Uses {YYYY}, {MM}, {DD} tokens; use * as a wildcard for any characters; everything else is matched literally.  ' +
+				'Example: "{YYYY}-{MM}-{DD} M!*" ignores any file starting with a date followed by " M!".'
 			)
 			.addTextArea((area) => {
 				area
-					.setPlaceholder('^\\d{4}-\\d{2}-\\d{2}$')
+					.setPlaceholder('{YYYY}-{MM}-{DD}')
 					.setValue(this.plugin.settings.ignorePatterns.join('\n'))
 					.onChange(async (value) => {
 						this.plugin.settings.ignorePatterns = value
@@ -356,18 +416,21 @@ class HideDatePrefixSettingTab extends PluginSettingTab {
 					});
 				area.inputEl.style.width = '100%';
 				area.inputEl.rows = 5;
-				// Match the min-width of the "Date pattern" text input above
 				window.requestAnimationFrame(() => {
-					if (datePatternInputEl) {
-						area.inputEl.style.minWidth = datePatternInputEl.offsetWidth + 'px';
+					if (dateFormatInputEl) {
+						area.inputEl.style.minWidth = dateFormatInputEl.offsetWidth + 'px';
 					}
 				});
 			});
 
+		// ── Today label for bare daily notes ──────────────────────────────────
+
+		let todayFormatSetting: Setting;
+
 		new Setting(containerEl)
-			.setName('Show "Today" label for today\'s daily note')
+			.setName('Show "Today" label for daily note')
 			.setDesc(
-				'Replaces today\'s date with a "Today" label in the file explorer. Updates automatically at midnight. ' +
+				'Replaces today\'s bare {YYYY-MM-DD} filename with a custom label. Updates at midnight.  ' +
 				'Example: "2026-03-03" → "Today     -03".'
 			)
 			.addToggle((toggle) =>
@@ -375,23 +438,61 @@ class HideDatePrefixSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.showTodayLabel)
 					.onChange(async (value) => {
 						this.plugin.settings.showTodayLabel = value;
+						todayFormatSetting.settingEl.style.display = value ? '' : 'none';
 						await this.plugin.saveSettings();
 					})
 			);
 
+		todayFormatSetting = new Setting(containerEl)
+			.setName('Label format')
+			.setDesc('Supports {YYYY}, {MM}, {DD}.  Default: Today     -{DD}')
+			.setClass('hdp-sub-setting')
+			.addText((text) =>
+				text
+					.setPlaceholder(DEFAULT_SETTINGS.todayLabelFormat)
+					.setValue(this.plugin.settings.todayLabelFormat)
+					.onChange(async (value) => {
+						this.plugin.settings.todayLabelFormat = value || DEFAULT_SETTINGS.todayLabelFormat;
+						await this.plugin.saveSettings();
+					})
+			);
+		todayFormatSetting.settingEl.style.display = this.plugin.settings.showTodayLabel ? '' : 'none';
+
+		// ── Today label for ignore-pattern matches ────────────────────────────
+
+		let todayIgnoredFormatSetting: Setting;
+
 		new Setting(containerEl)
-			.setName('Show "Today" label for ignore-pattern matches')
+			.setName('Show "Today" label for pattern ignore matches')
 			.setDesc(
-				'Also applies the Today label to files that match an ignore pattern but start with today\'s date. ' +
-				'Requires: "Show Today label" enabled. Example: "2026-03-03 Meetings" → "Today     -03 Meetings".'
+				'Also applies a Today label to ignored-pattern files that start with today\'s date.  ' +
+				'Requires: "Show Today label" enabled.  ' +
+				'Example: "2026-03-03 Meetings" → "Today\'s Meetings".'
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.showTodayLabelForIgnored)
 					.onChange(async (value) => {
 						this.plugin.settings.showTodayLabelForIgnored = value;
+						todayIgnoredFormatSetting.settingEl.style.display = value ? '' : 'none';
 						await this.plugin.saveSettings();
 					})
 			);
+
+		todayIgnoredFormatSetting = new Setting(containerEl)
+			.setName('Label format')
+			.setDesc('Supports {YYYY}, {MM}, {DD}. The rest of the filename is appended after.  ' +
+				'Default: Today\'s ')
+			.setClass('hdp-sub-setting')
+			.addText((text) =>
+				text
+					.setPlaceholder(DEFAULT_SETTINGS.todayLabelForIgnoredFormat)
+					.setValue(this.plugin.settings.todayLabelForIgnoredFormat)
+					.onChange(async (value) => {
+						this.plugin.settings.todayLabelForIgnoredFormat = value || DEFAULT_SETTINGS.todayLabelForIgnoredFormat;
+						await this.plugin.saveSettings();
+					})
+			);
+		todayIgnoredFormatSetting.settingEl.style.display = this.plugin.settings.showTodayLabelForIgnored ? '' : 'none';
 	}
 }
