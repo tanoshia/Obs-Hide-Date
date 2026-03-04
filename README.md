@@ -95,6 +95,13 @@ Settings using the old `{YYYY}-{MM}-{DD}` token syntax are automatically migrate
 
 Renaming would break internal links and require vault reorganisation. This plugin is **purely visual** — filenames, links, frontmatter and every other Obsidian feature are never touched.
 
-## Next Up
+## Planned
 
-Renaming affected tabs too (consistency)
+- [x] Handle custom patterns to ignore (like {{date}} Meetings)
+- [x] Format date as Obi daily note does ([moment.js](https://momentjs.com/docs/#/displaying/format/))
+- [x] MIT license
+- [ ] fix: Update "Today" for old notes; issue: prior day's note still displays as custom "today" format next day, needs manual update to fix currently
+- [ ] Publish/submit to Obsidian Community Plugins
+- [ ] feat: Rename affected tabs too (consistency)
+- [ ] feat: Add `yesterday` tag (similar to Today unique handling), allow it to exclude days (custom weekend)
+- [ ] Handle future dated notes differently?
