@@ -5,6 +5,23 @@
 Configure how a title's date prefix appears in the browser/tab name!
 Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th`) for today's and yesterday's notes in the file explorer, and hides the leading date prefix from all other notes. Works out of the box with Obsidian's default Daily Notes format (`YYYY-MM-DD`). This is a purely visual change; no files are ever renamed or modified.
 
+## How to install
+
+### From within Obsidian
+
+You can activate this plugin within Obsidian by doing the following:
+
+- Open Settings > Third-party plugin
+- Make sure Safe mode is off
+- Click Browse community plugins
+- Search for "Outliner"
+- Click Install
+- Once installed, close the community plugins window and activate the newly installed plugin
+
+### Manual installation
+
+Download `main.js`, `manifest.json`, `styles.css` from the [latest release](https://github.com/vslinko/obsidian-outliner/releases/latest) and put them into `<vault>/.obsidian/plugins/obsidian-outliner` folder.
+
 ## Features
 
 - **Date prefix hiding** — strips the configured date prefix from the displayed title in the file explorer
