@@ -20,7 +20,7 @@ You can activate this plugin within Obsidian by doing the following:
 
 ### Manual installation
 
-Download `main.js`, `manifest.json`, `styles.css` from the [latest release](https://github.com/vslinko/obsidian-outliner/releases/latest) and put them into `<vault>/.obsidian/plugins/obsidian-outliner` folder.
+Download `main.js`, `manifest.json`, `styles.css` from the [latest release](https://github.com/tanoshia/obsidian-today-alias/releases/latest) and put them into `<vault>/.obsidian/plugins/obsidian-today-alias` folder.
 
 ## Features
 
