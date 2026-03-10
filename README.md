@@ -1,14 +1,15 @@
 # Today Alias — Obsidian Plugin
 
-**Version 1.5.3**
+**Version 1.6.1**
 
-Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th`) for today's and yesterday's notes in the file explorer, and hides the leading date prefix from all other notes. The underlying filenames — and therefore all date-based sorting — are never touched. Works out of the box with Obsidian's default Daily Notes format (`YYYY-MM-DD`). This is a purely visual change; no files are ever renamed or modified.
+Configure how a title's date prefix appears in the browser/tab name!
+Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th`) for today's and yesterday's notes in the file explorer, and hides the leading date prefix from all other notes. Works out of the box with Obsidian's default Daily Notes format (`YYYY-MM-DD`). This is a purely visual change; no files are ever renamed or modified.
 
 ## Features
 
 - **Date prefix hiding** — strips the configured date prefix from the displayed title in the file explorer
 - **[Moment.js format strings](https://momentjs.com/docs/#/displaying/format/)** — uses the same format system as Obsidian's own Templates and Templater plugins (`YYYY`, `MM`, `DD`, `HH`, `mm`, `Do`, `MMMM`, etc.); no regex required
-- **Sort order preserved** — Obsidian sorts by the actual filename; only what you see changes
+- **Sort order preserved** — Obsidian browser still sorts by the actual filename; only what you see changes. Ordering by date still applies!
 - **"Today" label** — a Daily Note whose filename matches today's date is shown with a configurable label (default `✘ Today, Mar 10th`), updating automatically when the day rolls over via a window-focus listener, a 60-second background check, and a precise midnight timeout
 - **"Yesterday" label** — yesterday's bare Daily Note and pattern-matched notes each get their own configurable label/prefix (default `↩ Yesterday, Mar 9th` / `↩ Yesterday's `), mirroring the Today feature exactly
 - **Ignore patterns** — Moment.js format patterns to keep certain filenames fully untouched; bare Daily Notes and Meetings notes are pre-filled by default; `*` is supported as a wildcard; a live preview of each pattern with today's date updates in real time
@@ -97,11 +98,16 @@ Settings using the old `{YYYY}-{MM}-{DD}` token syntax are automatically migrate
 
 ## Changelog
 
+### v1.6.1
+- **chore:** Version bump; merge remote How-to-Install section and new Planned items
+
+### v1.6.0 — Tab title aliasing
+- **feat:** Tab title aliasing — open editor tabs (tab strip + header bar) now show the same alias or date-stripped title as the file explorer
+
 ### v1.5.3 — Today Alias (renamed)
 - **Renamed** plugin from *Hide Date Prefix* to *Today Alias* to better reflect its primary purpose
 - **feat:** Yesterday label — yesterday's bare Daily Note and pattern-matched notes each get a configurable alias/prefix (mirrors the Today feature exactly)
 - **fix:** Prior-day notes now update correctly when the day rolls over; the old Today label no longer persists on the previous day's note
-- **feat:** Tab title aliasing — open editor tabs (tab strip + header bar) now show the same alias or date-stripped title as the file explorer
 
 ### v1.4.x → v1.5.x
 - Moment.js format strings replace the old `{TOKEN}` syntax everywhere (auto-migrated on first load)
@@ -119,6 +125,8 @@ Renaming would break internal links and require vault reorganisation. This plugi
 - [x] ~~MIT license (v1.4.5b)~~
 - [x] ~~fix: Update "Today" for old notes; issue: prior day's note still displays as custom "today" format next day, needs manual update to fix currently~~
 - [x] ~~feat: Add `yesterday` tag (similar to Today unique handling) (v1.5.3)~~
-- [x] ~~feat: Rename affected tabs too (consistency) (v1.5.3)~~
+- [x] ~~feat: Rename affected tabs too (consistency) (v1.6.0)~~
 - [ ] Publish/submit to Obsidian Community Plugins (v2.0.x)
 - [ ] Handle future dated notes differently?
+- [ ] Option to pin Today/Yesterday notes to top (of partent folder)
+   - [ ] Option to pin folders to top (relatively)
