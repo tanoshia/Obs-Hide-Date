@@ -10,6 +10,9 @@ node_modules/
 # macOS
 .DS_Store
 
+# Zip artifacts
+*.zip
+
 # Editor
 .vscode/
 .idea/

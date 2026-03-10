@@ -1,6 +1,6 @@
 {
   "name": "obsidian-today-alias",
-  "version": "1.6.1",
+  "version": "2.0.0",
   "description": "Obsidian plugin to show today/yesterday aliases and hide date prefixes in the file explorer",
   "main": "main.js",
   "scripts": {
