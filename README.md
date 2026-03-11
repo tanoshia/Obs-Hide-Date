@@ -113,33 +113,6 @@ Reload Obsidian (**Ctrl/Cmd+R** in developer mode, or close and reopen), then go
 
 Settings using the old `{YYYY}-{MM}-{DD}` token syntax are automatically migrated to Moment.js equivalents on first load — no manual action needed.
 
-## Changelog
-
-### v2.0.3
-- **fix:** Replaced `innerHTML` usage in settings previews with safe DOM API calls (`empty()` / `appendText()` / `createEl()`) per Obsidian plugin security guidelines
-- **fix:** Moved all hardcoded inline styles from TypeScript to CSS classes (`ta-label-input`, `ta-prefix-input`, `ta-ignore-textarea`, `ta-ignore-setting`) per Obsidian plugin styling guidelines
-
-### v2.0.0 — First community release
-- **feat:** Published to Obsidian Community Plugins directory
-- **chore:** Added `LICENSE` (MIT), `versions.json`, and GitHub Actions release workflow
-- **fix:** Manifest description cleaned up (removed special characters per submission requirements)
-
-### v1.6.1
-- **chore:** Version bump; merge remote How-to-Install section and new Planned items
-
-### v1.6.0 — Tab title aliasing
-- **feat:** Tab title aliasing — open editor tabs (tab strip + header bar) now show the same alias or date-stripped title as the file explorer
-
-### v1.5.3 — Today Alias (renamed)
-- **Renamed** plugin from *Hide Date Prefix* to *Today Alias* to better reflect its primary purpose
-- **feat:** Yesterday label — yesterday's bare Daily Note and pattern-matched notes each get a configurable alias/prefix (mirrors the Today feature exactly)
-- **fix:** Prior-day notes now update correctly when the day rolls over; the old Today label no longer persists on the previous day's note
-
-### v1.4.x → v1.5.x
-- Moment.js format strings replace the old `{TOKEN}` syntax everywhere (auto-migrated on first load)
-- Live format previews in all settings fields
-- Responsive Today / Yesterday settings rows
-
 ## Why not rename the files?
 
 Renaming would break internal links and require vault reorganisation. This plugin is **purely visual** — filenames, links, frontmatter and every other Obsidian feature are never touched.
