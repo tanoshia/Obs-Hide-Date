@@ -14,8 +14,8 @@ Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th
 - Search for "Today Alias"
 - Install and enable
 
-**Via BRAT** (for beta testing)
-- Install [BRAT](https://github.com/TfTHacker/obsidian42-brat)
+**Via BRAT** (for beta testing) ([GitHub page](https://github.com/TfTHacker/obsidian42-brat))
+- Install [BRAT](https://obsidian.md/plugins?id=brat)
 - Add beta plugin: `tanoshia/obsidian-today-alias`
 
 ## Features
