@@ -5,26 +5,18 @@
 Configure how a title's date prefix appears in the browser/tab name!
 Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th`) for today's and yesterday's notes in the file explorer, and hides the leading date prefix from all other notes. Works out of the box with Obsidian's default Daily Notes format (`YYYY-MM-DD`). This is a purely visual change; no files are ever renamed or modified.
 
-## How to install
+## Quick Start
 
-### From within Obsidian *(Once Approved)*
- 
-> **Publish status:** *Pending Obsidian review - Mar 11th*
+### 1. Install the Plugin
 
-You can activate this plugin within Obsidian by doing the following:
-
-- Open Settings > Third-party plugin
-- Make sure Safe mode is off
-- Click Browse community plugins
+**Via Obsidian Community Plugins** (coming soon)
+- Open Settings → Community plugins
 - Search for "Today Alias"
-- Click Install
-- Once installed you may need to refresh your community plugins
+- Install and enable
 
-### Manual installation
-
-Download `main.js`, `manifest.json`, `styles.css` from the [latest release](https://github.com/tanoshia/obsidian-today-alias/releases/latest) and put them into `<vault>/.obsidian/plugins/obsidian-today-alias` folder.
-
-> *If available, install from the Community Plugins store receive future updates*
+**Via BRAT** (for beta testing)
+- Install [BRAT](https://github.com/TfTHacker/obsidian42-brat)
+- Add beta plugin: `tanoshia/obsidian-today-alias`
 
 ## Features
 
