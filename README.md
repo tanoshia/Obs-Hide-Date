@@ -35,6 +35,8 @@ Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th
 
 ## Example
 
+![Image](https://github.com/tanoshia/obsidian-today-alias/blob/main/TodayAliasCompareFull.png)
+
 | Filename on disk | Shown in explorer |
 |---|---|
 | `2026-03-10` *(today, bare daily note)* | `✘ Today, Mar 10th` |
