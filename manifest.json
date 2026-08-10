@@ -1,8 +1,8 @@
 {
   "id": "today-alias",
   "name": "Today Alias",
-  "version": "2.0.4",
-  "minAppVersion": "1.0.0",
+  "version": "2.0.5",
+  "minAppVersion": "1.2.3",
   "description": "Shows configurable aliases (e.g. \"Today\" / \"Yesterday\") for notes with date prefix in the file explorer. Hides date prefixes from all other notes. Sort order is preserved.",
   "author": "tanoshia",
   "authorUrl": "https://github.com/tanoshia",

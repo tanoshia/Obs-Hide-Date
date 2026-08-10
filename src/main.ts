@@ -3,8 +3,10 @@ import { TodayAliasSettings, DEFAULT_SETTINGS } from './settings';
 
 export default class TodayAliasPlugin extends Plugin {
 	settings: TodayAliasSettings;
-	private observer: MutationObserver | null = null;
-	private tabObserver: MutationObserver | null = null;
+	/** One MutationObserver per observed file-explorer container (main + any popout). */
+	private explorerObservers: MutationObserver[] = [];
+	/** One MutationObserver per workspace Document (main + each popout). */
+	private tabObservers: MutationObserver[] = [];
 	/** Tracks alias replacements made on tab-title elements so they can be cleanly restored. */
 	private tabAliasMap = new WeakMap<HTMLElement, { original: string; alias: string }>();
 	/** CSS selectors for the two tab-title locations Obsidian renders. */
@@ -33,19 +35,20 @@ export default class TodayAliasPlugin extends Plugin {
 		this.register(() => window.removeEventListener('focus', onFocus));
 
 		// 2. Polling fallback for windows left open without regaining focus.
-		const intervalId = window.setInterval(() => this.checkDateChange(), 60_000);
-		this.register(() => window.clearInterval(intervalId));
+		// Capture the scheduling window so teardown clears the same timer.
+		const intervalWin = activeWindow;
+		const intervalId = intervalWin.setInterval(() => this.checkDateChange(), 60_000);
+		this.register(() => intervalWin.clearInterval(intervalId));
 
 		// 3. Precise midnight trigger for when the app stays active all night.
 		this.scheduleMidnightRefresh();
 
 		// Re-process after any vault rename so the explorer and tabs always
-		// reflect the latest filename immediately.
+		// reflect the latest filename immediately (all open windows).
 		this.registerEvent(this.app.vault.on('rename', () => {
 			if (!this.settings.enabled) return;
-			setTimeout(() => {
-				document
-					.querySelectorAll<HTMLElement>('.nav-file-title-content')
+			activeWindow.setTimeout(() => {
+				this.queryAllDocuments<HTMLElement>('.nav-file-title-content')
 					.forEach((el) => this.processItem(el));
 				this.refreshTabs();
 			}, 50);
@@ -56,13 +59,26 @@ export default class TodayAliasPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', () => {
 				if (!this.settings.enabled) return;
-				setTimeout(() => this.refreshTabs(), 50);
+				activeWindow.setTimeout(() => this.refreshTabs(), 50);
 			})
 		);
 		this.registerEvent(
 			this.app.workspace.on('layout-change', () => {
 				if (!this.settings.enabled) return;
-				setTimeout(() => this.refreshTabs(), 50);
+				activeWindow.setTimeout(() => this.refreshTabs(), 50);
+			})
+		);
+
+		// Attach / resync observers when popout windows open or close so tab
+		// titles (and any explorer leaves) in secondary windows stay labelled.
+		this.registerEvent(
+			this.app.workspace.on('window-open', () => {
+				activeWindow.setTimeout(() => this.startObserver(), 50);
+			})
+		);
+		this.registerEvent(
+			this.app.workspace.on('window-close', () => {
+				this.startObserver();
 			})
 		);
 	}
@@ -73,8 +89,43 @@ export default class TodayAliasPlugin extends Plugin {
 		this.restoreAllTabs();
 	}
 
+	// ─── Multi-window DOM helpers ─────────────────────────────────────────────
+
+	/**
+	 * Unique Document objects for the main workspace and every open popout.
+	 * Bulk restore/process must walk all of these — `activeDocument` alone only
+	 * covers the focused window.
+	 */
+	private getWorkspaceDocuments(): Document[] {
+		const docs = new Set<Document>();
+		docs.add(this.app.workspace.containerEl.doc);
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			docs.add(leaf.getContainer().doc);
+		});
+		return [...docs];
+	}
+
+	/** querySelectorAll across every open workspace Document. */
+	private queryAllDocuments<E extends Element>(selector: string): E[] {
+		const results: E[] = [];
+		for (const doc of this.getWorkspaceDocuments()) {
+			results.push(...Array.from(doc.querySelectorAll<E>(selector)));
+		}
+		return results;
+	}
+
+	/**
+	 * Root element to observe for tab-title mutations in a given Document.
+	 * Main window uses workspace.containerEl; popouts use `.workspace` or body.
+	 */
+	private getTabObserveRoot(doc: Document): HTMLElement {
+		const main = this.app.workspace.containerEl;
+		if (doc === main.doc) return main;
+		return doc.querySelector<HTMLElement>('.workspace') ?? doc.body;
+	}
+
 	async loadSettings() {
-		const loaded = await this.loadData();
+		const loaded = await this.loadData() as Partial<TodayAliasSettings> | null;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
 
 		// ── Migrate pre-1.4.0 settings ({TOKEN} style → Moment.js style) ───────
@@ -163,28 +214,54 @@ export default class TodayAliasPlugin extends Plugin {
 
 	// ─── Observer lifecycle ───────────────────────────────────────────────────
 
+	/**
+	 * (Re)attach MutationObservers for every open window. Safe to call again on
+	 * window-open / window-close — disconnects previous observers first.
+	 */
 	startObserver() {
-		const leaves = this.app.workspace.getLeavesOfType('file-explorer');
-		if (leaves.length === 0) return;
+		this.stopObserver();
 
-		const container = leaves[0].view.containerEl;
-
-		// Process what's already rendered
-		if (this.settings.enabled) {
-			this.processContainer(container);
+		// Watch each file-explorer leaf (normally main window only).
+		for (const leaf of this.app.workspace.getLeavesOfType('file-explorer')) {
+			const container = leaf.view.containerEl;
+			if (this.settings.enabled) {
+				this.processContainer(container);
+			}
+			const observer = this.createExplorerObserver();
+			observer.observe(container, { childList: true, subtree: true, characterData: true });
+			this.explorerObservers.push(observer);
 		}
 
-		// Watch for DOM changes in the explorer tree
-		this.observer = new MutationObserver((mutations) => {
+		// Tab titles exist in every window — observe main + each popout Document.
+		for (const doc of this.getWorkspaceDocuments()) {
+			const root = this.getTabObserveRoot(doc);
+			const observer = this.createTabObserver();
+			observer.observe(root, { childList: true, subtree: true, characterData: true });
+			this.tabObservers.push(observer);
+		}
+
+		if (this.settings.enabled) this.processAllTabs();
+	}
+
+	stopObserver() {
+		for (const obs of this.explorerObservers) obs.disconnect();
+		this.explorerObservers = [];
+		for (const obs of this.tabObservers) obs.disconnect();
+		this.tabObservers = [];
+	}
+
+	/** MutationObserver callback factory for file-explorer title nodes. */
+	private createExplorerObserver(): MutationObserver {
+		return new MutationObserver((mutations) => {
 			if (!this.settings.enabled) return;
 
 			const toProcess = new Set<HTMLElement>();
 
 			for (const mutation of mutations) {
-				const target = mutation.target as HTMLElement;
+				const target = mutation.target;
 
 				// Skip mutations we caused (our own spans being inserted)
-				if (target instanceof HTMLElement &&
+				if (target.instanceOf(HTMLElement) &&
 					(target.classList.contains('ta-date') || target.classList.contains('ta-rest'))) {
 					continue;
 				}
@@ -192,13 +269,13 @@ export default class TodayAliasPlugin extends Plugin {
 				if (mutation.type === 'childList') {
 					// Case 1: a nav-file-title-content was updated in-place (Obsidian
 					// empties the element and inserts a new text node on rename)
-					if (target instanceof HTMLElement &&
+					if (target.instanceOf(HTMLElement) &&
 						target.classList.contains('nav-file-title-content')) {
 						toProcess.add(target);
 					}
 
 					mutation.addedNodes.forEach((node) => {
-						if (node instanceof HTMLElement) {
+						if (node.instanceOf(HTMLElement)) {
 							// Case 2: a whole nav-file-title-content element was added
 							if (node.classList.contains('nav-file-title-content')) {
 								toProcess.add(node);
@@ -228,34 +305,19 @@ export default class TodayAliasPlugin extends Plugin {
 
 			toProcess.forEach((el) => this.processItem(el));
 		});
-
-		this.observer.observe(container, { childList: true, subtree: true, characterData: true });
-
-		// Start the parallel observer for tab titles
-		this.startTabObserver();
 	}
-
-	stopObserver() {
-		this.observer?.disconnect();
-		this.observer = null;
-		this.stopTabObserver();
-	}
-
-	// ─── Tab observer lifecycle ───────────────────────────────────────────────
 
 	/**
-	 * Observes the workspace container for mutations to tab-title elements,
-	 * skipping mutations that we ourselves caused.
+	 * MutationObserver callback factory for tab-title elements, skipping
+	 * mutations that we ourselves caused.
 	 */
-	startTabObserver() {
-		const workspaceEl = (this.app.workspace as unknown as { containerEl: HTMLElement }).containerEl;
-
-		this.tabObserver = new MutationObserver((mutations) => {
+	private createTabObserver(): MutationObserver {
+		return new MutationObserver((mutations) => {
 			if (!this.settings.enabled) return;
 			const toProcess = new Set<HTMLElement>();
 
-			const isTabTitle = (el: Element | null): el is HTMLElement =>
-				el instanceof HTMLElement &&
+			const isTabTitle = (el: Node | null): el is HTMLElement =>
+				!!el && el.instanceOf(HTMLElement) &&
 				(el.classList.contains('view-header-title') ||
 					el.classList.contains('workspace-tab-header-inner-title'));
 
@@ -274,11 +336,11 @@ export default class TodayAliasPlugin extends Plugin {
 				}
 
 				if (m.type === 'childList') {
-					const t = m.target as HTMLElement;
+					const t = m.target;
 					if (isTabTitle(t)) enqueue(t);
 
 					m.addedNodes.forEach((node) => {
-						if (!(node instanceof HTMLElement)) return;
+						if (!node.instanceOf(HTMLElement)) return;
 						if (node.classList.contains('view-header-title') ||
 							node.classList.contains('workspace-tab-header-inner-title')) {
 							toProcess.add(node);
@@ -292,16 +354,6 @@ export default class TodayAliasPlugin extends Plugin {
 
 			toProcess.forEach((el) => this.processTab(el));
 		});
-
-		this.tabObserver.observe(workspaceEl, { childList: true, subtree: true, characterData: true });
-
-		// Label whatever is already open
-		if (this.settings.enabled) this.processAllTabs();
-	}
-
-	stopTabObserver() {
-		this.tabObserver?.disconnect();
-		this.tabObserver = null;
 	}
 
 	// ─── DOM processing ───────────────────────────────────────────────────────
@@ -558,12 +610,12 @@ export default class TodayAliasPlugin extends Plugin {
 	}
 
 	restoreAllTabs() {
-		document.querySelectorAll<HTMLElement>(TodayAliasPlugin.TAB_SELECTORS)
+		this.queryAllDocuments<HTMLElement>(TodayAliasPlugin.TAB_SELECTORS)
 			.forEach((el) => this.restoreTab(el));
 	}
 
 	processAllTabs() {
-		document.querySelectorAll<HTMLElement>(TodayAliasPlugin.TAB_SELECTORS)
+		this.queryAllDocuments<HTMLElement>(TodayAliasPlugin.TAB_SELECTORS)
 			.forEach((el) => this.processTab(el));
 	}
 
@@ -586,8 +638,7 @@ export default class TodayAliasPlugin extends Plugin {
 	}
 
 	restoreAllItems() {
-		document
-			.querySelectorAll<HTMLElement>('.nav-file-title-content')
+		this.queryAllDocuments<HTMLElement>('.nav-file-title-content')
 			.forEach((el) => this.restoreItem(el));
 	}
 
@@ -697,11 +748,13 @@ export default class TodayAliasPlugin extends Plugin {
 		midnight.setDate(midnight.getDate() + 1);
 		midnight.setHours(0, 0, 5, 0); // 5 s past midnight
 		const ms = midnight.getTime() - now.getTime();
-		const id = window.setTimeout(() => {
+		// Capture the scheduling window so teardown clears the same timer.
+		const win = activeWindow;
+		const id = win.setTimeout(() => {
 			this.checkDateChange();
 			this.scheduleMidnightRefresh();
 		}, ms);
-		this.register(() => window.clearTimeout(id));
+		this.register(() => win.clearTimeout(id));
 	}
 
 	/**
@@ -727,8 +780,7 @@ export default class TodayAliasPlugin extends Plugin {
 		this.restoreAllItems();
 		this.restoreAllTabs();
 		if (this.settings.enabled) {
-			document
-				.querySelectorAll<HTMLElement>('.nav-file-title-content')
+			this.queryAllDocuments<HTMLElement>('.nav-file-title-content')
 				.forEach((el) => this.processItem(el));
 			this.processAllTabs();
 		}
@@ -786,7 +838,7 @@ class TodayAliasSettingTab extends PluginSettingTab {
 				});
 				frag.appendText('. Default: YYYY-MM-DD.');
 				frag.createEl('br');
-				dateFormatPreviewEl = frag.createEl('span', { cls: 'ta-preview' });
+				dateFormatPreviewEl = frag.createSpan({ cls: 'ta-preview' });
 				dateFormatPreviewEl.textContent = makePreview(this.plugin.settings.dateFormat);
 			}))
 			.addText((text) => {
@@ -835,7 +887,7 @@ class TodayAliasSettingTab extends PluginSettingTab {
 				frag.createEl('code', { text: '[literal]' });
 				frag.appendText(' to escape non-token characters. Bare-note toggle+format ┆ Pattern-prefix toggle+format.');
 				frag.createEl('br');
-				todayPreviewEl = frag.createEl('span', { cls: 'ta-preview' });
+				todayPreviewEl = frag.createSpan({ cls: 'ta-preview' });
 			}))
 			.addToggle((t) =>
 				t.setTooltip('Show label for bare today note')
@@ -922,7 +974,7 @@ class TodayAliasSettingTab extends PluginSettingTab {
 				frag.createEl('code', { text: '[literal]' });
 				frag.appendText(' to escape non-token characters. Bare-note toggle+format ┆ Pattern-prefix toggle+format.');
 				frag.createEl('br');
-				yesterdayPreviewEl = frag.createEl('span', { cls: 'ta-preview' });
+				yesterdayPreviewEl = frag.createSpan({ cls: 'ta-preview' });
 			}))
 			.addToggle((t) =>
 				t.setTooltip('Show label for bare yesterday note')
@@ -1018,7 +1070,7 @@ class TodayAliasSettingTab extends PluginSettingTab {
 				frag.createEl('code', { text: 'YYYY-MM-DD [M!]*' });
 				frag.appendText(' matches any file starting with a date followed by " M!".');
 				frag.createEl('br');
-				ignorePreviewEl = frag.createEl('span', { cls: 'ta-preview' });
+				ignorePreviewEl = frag.createSpan({ cls: 'ta-preview' });
 				ignorePreviewEl.textContent = makeIgnorePreview(this.plugin.settings.ignorePatterns);
 			}))
 			.addTextArea((area) => {
