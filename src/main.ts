@@ -1,5 +1,6 @@
-import { App, Plugin, PluginSettingTab, Setting, TextComponent, moment } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TextComponent, SettingDefinitionItem } from 'obsidian';
 import { TodayAliasSettings, DEFAULT_SETTINGS } from './settings';
+import { moment } from './moment';
 
 export default class TodayAliasPlugin extends Plugin {
 	settings: TodayAliasSettings;
@@ -35,10 +36,8 @@ export default class TodayAliasPlugin extends Plugin {
 		this.register(() => window.removeEventListener('focus', onFocus));
 
 		// 2. Polling fallback for windows left open without regaining focus.
-		// Capture the scheduling window so teardown clears the same timer.
-		const intervalWin = activeWindow;
-		const intervalId = intervalWin.setInterval(() => this.checkDateChange(), 60_000);
-		this.register(() => intervalWin.clearInterval(intervalId));
+		const intervalId = window.setInterval(() => this.checkDateChange(), 60_000);
+		this.register(() => window.clearInterval(intervalId));
 
 		// 3. Precise midnight trigger for when the app stays active all night.
 		this.scheduleMidnightRefresh();
@@ -47,7 +46,7 @@ export default class TodayAliasPlugin extends Plugin {
 		// reflect the latest filename immediately (all open windows).
 		this.registerEvent(this.app.vault.on('rename', () => {
 			if (!this.settings.enabled) return;
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				this.queryAllDocuments<HTMLElement>('.nav-file-title-content')
 					.forEach((el) => this.processItem(el));
 				this.refreshTabs();
@@ -59,13 +58,13 @@ export default class TodayAliasPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', () => {
 				if (!this.settings.enabled) return;
-				activeWindow.setTimeout(() => this.refreshTabs(), 50);
+				window.setTimeout(() => this.refreshTabs(), 50);
 			})
 		);
 		this.registerEvent(
 			this.app.workspace.on('layout-change', () => {
 				if (!this.settings.enabled) return;
-				activeWindow.setTimeout(() => this.refreshTabs(), 50);
+				window.setTimeout(() => this.refreshTabs(), 50);
 			})
 		);
 
@@ -73,7 +72,7 @@ export default class TodayAliasPlugin extends Plugin {
 		// titles (and any explorer leaves) in secondary windows stay labelled.
 		this.registerEvent(
 			this.app.workspace.on('window-open', () => {
-				activeWindow.setTimeout(() => this.startObserver(), 50);
+				window.setTimeout(() => this.startObserver(), 50);
 			})
 		);
 		this.registerEvent(
@@ -748,13 +747,11 @@ export default class TodayAliasPlugin extends Plugin {
 		midnight.setDate(midnight.getDate() + 1);
 		midnight.setHours(0, 0, 5, 0); // 5 s past midnight
 		const ms = midnight.getTime() - now.getTime();
-		// Capture the scheduling window so teardown clears the same timer.
-		const win = activeWindow;
-		const id = win.setTimeout(() => {
+		const id = window.setTimeout(() => {
 			this.checkDateChange();
 			this.scheduleMidnightRefresh();
 		}, ms);
-		this.register(() => win.clearTimeout(id));
+		this.register(() => window.clearTimeout(id));
 	}
 
 	/**
@@ -797,10 +794,32 @@ class TodayAliasSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
+	/**
+	 * Obsidian 1.13+: declarative definitions (search-indexed). Uses a render
+	 * host so the existing imperative UI (live previews, paired controls) stays
+	 * identical. Pre-1.13 still calls {@link display}.
+	 */
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: 'Today Alias',
+				desc: 'Aliases and date-prefix hiding for the file explorer and tabs.',
+				render: (setting) => {
+					setting.settingEl.hide();
+					const root = this.containerEl.createDiv({ cls: 'ta-settings-root' });
+					this.mountSettings(root);
+				},
+			},
+		];
+	}
 
+	display(): void {
+		this.containerEl.empty();
+		this.mountSettings(this.containerEl);
+	}
+
+	/** Shared settings UI for display() and getSettingDefinitions() render host. */
+	private mountSettings(containerEl: HTMLElement): void {
 		// Helper: create a live-preview line for a Moment.js format string
 		const makePreview = (fmt: string): string => {
 			try {

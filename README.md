@@ -1,6 +1,6 @@
 # Today Alias — Obsidian Plugin
 
-**Version 2.0.5**
+**Version 2.0.6**
 
 Configure how a title's date prefix appears in the browser/tab name!
 Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th`) for today's and yesterday's notes in the file explorer, and hides the leading date prefix from all other notes. Works out of the box with Obsidian's default Daily Notes format (`YYYY-MM-DD`). This is a purely visual change; no files are ever renamed or modified.
@@ -9,7 +9,7 @@ Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th
 
 ### 1. Install the Plugin
 
-**Via Obsidian Community Plugins** (coming soon)
+**Via Obsidian Community Plugins**
 - Open Settings → Community plugins
 - Search for "Today Alias"
 - Install and enable
@@ -35,7 +35,7 @@ Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th
 
 ## Example
 
-![Image](https://github.com/tanoshia/obsidian-today-alias/blob/main/TodayAliasCompareFull.png)
+![File explorer before and after Today Alias date labels](https://github.com/tanoshia/obsidian-today-alias/blob/main/TodayAliasCompareFull.png)
 
 | Filename on disk | Shown in explorer |
 |---|---|
@@ -115,15 +115,7 @@ Settings using the old `{YYYY}-{MM}-{DD}` token syntax are automatically migrate
 
 Renaming would break internal links and require vault reorganisation. This plugin is **purely visual** — filenames, links, frontmatter and every other Obsidian feature are never touched.
 
-## Planned
+## Possible future work
 
-- [x] ~~Handle custom patterns to ignore (like "YYYY-MM-DD Meetings")~~
-- [x] ~~Format date as Obi daily note does ([moment.js](https://momentjs.com/docs/#/displaying/format/))~~
-- [x] ~~MIT license (v1.4.5b)~~
-- [x] ~~fix: Update "Today" for old notes; issue: prior day's note still displays as custom "today" format next day, needs manual update to fix currently~~
-- [x] ~~feat: Add `yesterday` tag (similar to Today unique handling) (v1.5.3)~~
-- [x] ~~feat: Rename affected tabs too (consistency) (v1.6.0)~~
-- [x] ~~Publish/submit to Obsidian Community Plugins (v2.0.0)~~
-- [ ] Handle future dated notes differently?
-- [ ] Option to pin Today/Yesterday notes to top (of partent folder)
-   - [ ] Option to pin folders to top (relatively)
+- Handle future-dated notes differently
+- Option to pin Today/Yesterday notes to the top of their parent folder (and optionally pin folders relatively)

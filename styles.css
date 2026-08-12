@@ -88,10 +88,11 @@
   .ta-ctrl-group {
     width: 100%;
   }
-  /* Expand text inputs to fill their group */
-  .ta-ctrl-group input[type="text"] {
+  /* Expand text inputs to fill their group (override fixed widths via higher specificity) */
+  .ta-day-setting .ta-ctrl-group input.ta-label-input,
+  .ta-day-setting .ta-ctrl-group input.ta-prefix-input {
     flex: 1 1 0;
-    width: 0 !important; /* override inline width; flex: 1 takes over */
+    width: auto;
     min-width: 60px;
   }
 }
