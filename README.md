@@ -50,8 +50,8 @@ Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th
 
 ## How it works
 
-1. On load the plugin attaches a `MutationObserver` to the file-explorer container, watching for all DOM mutations (child additions, text swaps, character data changes).
-2. A `vault.on('rename')` listener acts as a safety net to catch any edge cases the observer misses.
+1. On load the plugin attaches `MutationObserver`s to file-explorer container(s) and workspace tab titles (main window and popouts), watching for DOM mutations (child additions, text swaps, character data changes).
+2. A `vault.on('rename')` listener acts as a safety net to catch any edge cases the observers miss.
 3. Whenever a `.nav-file-title-content` element is painted or updated:
    - If the filename exactly equals today's date and **Today** bare-note toggle is on → replaced with the configured Today label (e.g. `✘ Today, Mar 10th`)
    - If the filename exactly equals yesterday's date and **Yesterday** bare-note toggle is on → replaced with the configured Yesterday label (e.g. `↩ Yesterday, Mar 9th`)
@@ -60,7 +60,7 @@ Shows configurable aliases (e.g. `✘ Today, Mar 10th` / `↩ Yesterday, Mar 9th
    - If the filename matches any **ignore pattern** otherwise → left completely untouched
    - Otherwise the date prefix is wrapped in a hidden `<span class="ta-date">` and the rest shown in `<span class="ta-rest">`
 4. Day-rollover is detected by three complementary triggers: a **window focus** listener (fires when you switch back to Obsidian or the system wakes from sleep), a **60-second interval** (catches windows left open without regaining focus), and a precise **midnight timeout** (fires at 00:00:05 for fully-awake sessions). Any trigger that detects a date change calls a shared `checkDateChange()` which prevents duplicate refreshes.
-5. On unload every element is restored to its original plain-text form; no trace is left behind.
+5. On unload every element is restored to its original plain-text form across all open windows; no trace is left behind.
 
 ## Format reference
 
@@ -118,4 +118,4 @@ Renaming would break internal links and require vault reorganisation. This plugi
 ## Possible future work
 
 - Handle future-dated notes differently
-- Option to pin Today/Yesterday notes to the top of their parent folder (and optionally pin folders relatively)
+- Option to pin Today/Yesterday notes to the top of their parent folder (and optionally pin folders relatively) — tracked in [issue #1](https://github.com/tanoshia/obsidian-today-alias/issues/1)
